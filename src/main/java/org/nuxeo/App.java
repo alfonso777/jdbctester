@@ -16,13 +16,13 @@
  * 02111-1307, USA.
  *
  * Author: bdelbosc@nuxeo.com
+ * Improvements by: alfonso777@github
  *
  */
 package org.nuxeo;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
@@ -36,6 +36,8 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -70,9 +72,11 @@ public class App {
 
     private static final String DEFAULT_REPEAT = "100";
 
+    private static final Integer QUERY_SELECT_LIMIT = 137;
+
     public static void main(String[] args) throws SQLException, IOException {
 
-        Properties prop = readProperties();
+        Properties prop = Config.readProperties(CONFIG_KEY, DEFAULT_CONFIG_FILE);
         String user = prop.getProperty("user");
         String password = prop.getProperty("password");
         String connectionURL = prop.getProperty("url");
@@ -91,6 +95,9 @@ public class App {
         int repeat = Integer.valueOf(
                 System.getProperty(REPEAT_KEY, DEFAULT_REPEAT)).intValue();
 
+        if(query.toLowerCase().startsWith("select"))
+            query = query.replaceAll(";", "") + " LIMIT " + QUERY_SELECT_LIMIT.toString();
+    
         log.info("Submiting " + repeat + " queries: " + query);
         try {
             Class.forName(driver);
@@ -100,7 +107,7 @@ public class App {
             ps = conn.prepareStatement(query,
                     ResultSet.TYPE_SCROLL_INSENSITIVE,
                     ResultSet.CONCUR_READ_ONLY);
-
+            
             int paramCount = countOccurrences(query, '?');
             for (int i = 1; i <= paramCount; i++) {
                 String key = "p" + i;
@@ -135,19 +142,31 @@ public class App {
                 tc.stop();
                 tc = fetchingTimer.time();
                 ResultSetMetaData rsmd = rs.getMetaData();
-                int cols = rsmd.getColumnCount();
+                Integer cols = rsmd.getColumnCount();
+                String header = IntStream.range(1,cols+1).mapToObj(index -> getHeaderColumnValue(rsmd,index)).collect(Collectors.joining("\t"));
+                log.info("Header: [" + header + "]");
+                log.info("==========Result===========");
                 while (rs.next()) {
                     rows++;
                     for (int c = 1; c <= cols; c++) {
                         bytes += rs.getBytes(1).length;
                     }
+
+                    if(repeat == 1 ) {
+                        final ResultSet rsf = rs;
+                        String fullRow = IntStream.range(1,cols+1).mapToObj(index -> getValue(rsf, index)).collect(Collectors.joining("\t"));
+                        log.info(fullRow);
+                    }
+                    
+                    
+                    
                 }
                 rs.close();
                 tc.stop();
                 // don't stress too much
                 Thread.sleep((int) (Math.random() * 100));
             }
-            log.info("Fetched rows: " + rows + ", total bytes: " + bytes
+            log.info("\nFetched rows: " + rows + ", total bytes: " + bytes
                     + ", bytes/rows: " + ((float) bytes) / rows);
 
         } catch (SQLException e) {
@@ -195,25 +214,21 @@ public class App {
         return count;
     }
 
-    private static Properties readProperties() throws IOException {
-        Properties prop = new Properties();
-        FileInputStream fs;
+    private static String getValue(ResultSet rs, int columnIndex) {
         try {
-            fs = new FileInputStream(System.getProperty(CONFIG_KEY));
-        } catch (FileNotFoundException e) {
-            log.error(
-                    "Property file not found: "
-                            + System.getProperty(CONFIG_KEY, CONFIG_KEY), e);
-            return null;
+            Object value = rs.getObject(columnIndex);
+            return rs.wasNull() ? "null" : value.toString();
+        } catch (SQLException e) {
+            return "ERROR";
         }
+    }
+    
+    private static String getHeaderColumnValue(ResultSetMetaData rsmd, int index) {
         try {
-            prop.load(fs);
-            fs.close();
-        } catch (IOException e) {
-            log.error(e.getMessage(), e);
-        } catch (NullPointerException e) {
-            log.error("File not found " + DEFAULT_CONFIG_FILE, e);
+            Object value = rsmd.getColumnName(index);
+            return value == null ? "null" : value.toString();
+        } catch (SQLException e) {
+            return "ERROR";
         }
-        return prop;
     }
 }

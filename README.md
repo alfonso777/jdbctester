@@ -8,25 +8,19 @@ Also it can be used to test prepared statement from JDBC.
 # Install
 
 ## Using a binary package
-
-Get the latest package from: 
-<http://public.dev.nuxeo.com/~ben/jdbctester/>
- 
-Then install where you want:
-
-       tar xzvf jdbctester-*.tgz
-
+...
 
 ## Building from sources
 
 Build:
-
-        mvn package
-		
+```
+mvn -o clean package
+```		
 Create a binary package
+```
+./scripts/package.sh
+```
 
-        ./scripts/package.sh
-		
 Then untar where you want.
 
 ## Add your JDBC Driver
@@ -37,6 +31,9 @@ $JDBCTESTER_HOME/lib repository.
 
 
 # Usage
+```
+/path/to/jdbctester.sh PROPERTY_FILE [REPEAT]
+```
 
 ## Configuration
 
@@ -57,23 +54,25 @@ parameters.
 
 Note that by default jdbctester.sh set the following options, you
 shoud check that it matches your database locale:
-
-     -Duser.language=en -Duser.country=US
-
+```
+-Duser.language=en -Duser.country=US
+```
 
 ## Invocation
+```
+/path/to/jdbctester.sh PROPERTY_FILE [REPEAT]
+```
 
-       /path/to/jdbctester.sh PROPERTY_FILE [REPEAT]
-    
 REPEAT is number of time to repeat the SQL query, the default value is
 10.
 
 Example:
-
-      ./jdbctester.sh postgresql.properties 10
+```
+./jdbctester.sh postgresql.properties 10
+```
 
 This will create a jdbctester.log file and output something like this:
-
+```
         Connect to:jdbc:postgresql://localhost:5432/template1 from strix
         Submiting 10 queries: SELECT 1;
         Fetched rows: 10, total bytes: 25, bytes/rows: 2.5
@@ -128,7 +127,7 @@ This will create a jdbctester.log file and output something like this:
                     98% <= 17.35ms
                     99% <= 17.35ms
                   99.9% <= 17.35ms
-      
+```      
 
 
 # About Nuxeo
